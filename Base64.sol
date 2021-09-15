@@ -1,67 +1,60 @@
-pragma solidity ^0.5.0;
-
+/// [MIT License]
+/// @title Base64
+/// @notice Provides a function for encoding some bytes in base64
+/// @author Brecht Devos <brecht@loopring.org>
 library Base64 {
+    bytes internal constant TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-    bytes constant private base64stdchars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    bytes constant private base64urlchars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    /// @notice Encodes some bytes to the base64 representation
+    function encode(bytes memory data) internal pure returns (string memory) {
+        uint256 len = data.length;
+        if (len == 0) return "";
 
-    function encode(string memory _str) internal pure returns (string memory) {
+        // multiply by 4/3 rounded up
+        uint256 encodedLen = 4 * ((len + 2) / 3);
 
-        bytes memory _bs = bytes(_str);
-        uint256 rem = _bs.length % 3;
+        // Add some extra buffer at the end
+        bytes memory result = new bytes(encodedLen + 32);
 
-        uint256 res_length = (_bs.length + 2) / 3 * 4 - ((3 - rem) % 3);
-        bytes memory res = new bytes(res_length);
+        bytes memory table = TABLE;
 
-        uint256 i = 0;
-        uint256 j = 0;
+        assembly {
+            let tablePtr := add(table, 1)
+            let resultPtr := add(result, 32)
 
-        for (; i + 3 <= _bs.length; i += 3) {
-            (res[j], res[j+1], res[j+2], res[j+3]) = encode3(
-                uint8(_bs[i]),
-                uint8(_bs[i+1]),
-                uint8(_bs[i+2])
-            );
+            for {
+                let i := 0
+            } lt(i, len) {
 
-            j += 4;
-        }
+            } {
+                i := add(i, 3)
+                let input := and(mload(add(data, i)), 0xffffff)
 
-        if (rem != 0) {
-            uint8 la0 = uint8(_bs[_bs.length - rem]);
-            uint8 la1 = 0;
+                let out := mload(add(tablePtr, and(shr(18, input), 0x3F)))
+                out := shl(8, out)
+                out := add(out, and(mload(add(tablePtr, and(shr(12, input), 0x3F))), 0xFF))
+                out := shl(8, out)
+                out := add(out, and(mload(add(tablePtr, and(shr(6, input), 0x3F))), 0xFF))
+                out := shl(8, out)
+                out := add(out, and(mload(add(tablePtr, and(input, 0x3F))), 0xFF))
+                out := shl(224, out)
 
-            if (rem == 2) {
-                la1 = uint8(_bs[_bs.length - 1]);
+                mstore(resultPtr, out)
+
+                resultPtr := add(resultPtr, 4)
             }
 
-            (byte b0, byte b1, byte b2, byte b3) = encode3(la0, la1, 0);
-            res[j] = b0;
-            res[j+1] = b1;
-            if (rem == 2) {
-              res[j+2] = b2;
+            switch mod(len, 3)
+            case 1 {
+                mstore(sub(resultPtr, 2), shl(240, 0x3d3d))
             }
+            case 2 {
+                mstore(sub(resultPtr, 1), shl(248, 0x3d))
+            }
+
+            mstore(result, encodedLen)
         }
 
-        return string(res);
+        return string(result);
     }
-
-    function encode3(uint256 a0, uint256 a1, uint256 a2)
-        private
-        pure
-        returns (byte b0, byte b1, byte b2, byte b3)
-    {
-
-        uint256 n = (a0 << 16) | (a1 << 8) | a2;
-
-        uint256 c0 = (n >> 18) & 63;
-        uint256 c1 = (n >> 12) & 63;
-        uint256 c2 = (n >>  6) & 63;
-        uint256 c3 = (n      ) & 63;
-
-        b0 = base64urlchars[c0];
-        b1 = base64urlchars[c1];
-        b2 = base64urlchars[c2];
-        b3 = base64urlchars[c3];
-    }
-
 }
