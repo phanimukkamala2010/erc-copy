@@ -14,6 +14,10 @@ contract FantasyCricketCoin is ERC20 {
     uint256 private MAX_ADDRESS_SUPPLY = 10;
     address private _owner = address(0);
 
+    function getOwner() external view returns (address) {
+        return _owner;
+    }
+
     function mintCoin(uint256 amount) external {
         require(super.totalSupply() < MAX_CURRENT_SUPPLY, "cannot mint anymore coins");
         _mint(_msgSender(), amount);
